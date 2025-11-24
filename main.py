@@ -1,140 +1,113 @@
-from datetime import datetime 
-import os 
-import re 
- 
-time_format = "%H:%M" 
-file_name = "gorev.txt" 
- 
-def input_time(prompt): 
-    while True: 
-        time_str = input(prompt).strip() 
-        try: 
-            valid_time = datetime.strptime(time_str, time_format) 
-            return valid_time 
-        except ValueError: 
-            print("Hatalı format! Lütfen saati 'HH:MM' formatında giriniz (ör: 14:30).") 
- 
-def input_times(): 
-    times = [] 
-    while True: 
-        try: 
-            n = int(input("Kaç adet zaman aralığı gireceksiniz? ")) 
-            if n <= 0: 
-                print("Lütfen pozitif bir sayı giriniz.") 
-                continue 
-            break 
-        except ValueError: 
-            print("Lütfen geçerli bir sayı giriniz.") 
- 
-    for i in range(n): 
-        print(f"\n{i+1}. zaman aralığı:") 
-        start_dt = input_time("  Giriş saati (HH:MM): ") 
-        end_dt = input_time("  Çıkış saati (HH:MM): ") 
-        times.append((start_dt, end_dt)) 
-    return times 
- 
-def calculate_durations(times): 
-    total_minutes = 0 
-    total_hours = 0.0 
-    results = [] 
- 
-    for start_dt, end_dt in times: 
-        duration = end_dt - start_dt 
-        minutes = duration.total_seconds() / 60 
-        hours = minutes / 60 
-        total_minutes += minutes 
-        total_hours += hours 
-        results.append({ 
-            "Başlangıç": start_dt.strftime(time_format), 
-            "Bitiş": end_dt.strftime(time_format), 
-            "Süre (dk)": round(minutes), 
-            "Süre (saat)": round(hours, 2) 
-        }) 
-    return results, total_minutes, total_hours 
- 
-def read_existing_total(): 
-    """Dosyadaki mevcut toplam süreyi dakika cinsinden döndürür, yoksa 0.""" 
-    if not os.path.isfile(file_name): 
-        return 0 
- 
-    with open(file_name, "r", encoding="utf-8") as f: 
-        lines = f.readlines() 
- 
-    # Sadece en son 'Genel Toplam Süre' satırını bul 
-    total_pattern = re.compile(r"Genel Toplam Süre:\s*(\d+)\s*dakika", 
-re.IGNORECASE) 
-    for line in reversed(lines): 
-        match = total_pattern.search(line) 
-        if match: 
-            return int(match.group(1)) 
-    return 0 
- 
-def remove_old_totals_and_trailing_separator(lines): 
-    """Dosyadaki önceki toplam süre satırlarını ve eşit işaretli çizgiyi 
-çıkarır.""" 
-    new_lines = [] 
-    skip_pattern = re.compile(r"^Toplam Süre:.*|^=+$") 
-    for line in lines: 
-        if skip_pattern.match(line.strip()): 
-            continue 
-        new_lines.append(line) 
-    return new_lines 
- 
-def print_results_and_update_total(results, total_minutes_new, total_hours_new): 
-    header = f"{'Başlangıç':<10} {'Bitiş':<10} {'Süre (dk)':<10} {'Süre (saat)':<12}" 
-    separator = "-" * 45 
- 
-    # Mevcut dosya varsa oku 
-    if os.path.isfile(file_name): 
-        with open(file_name, "r", encoding="utf-8") as f: 
-            existing_lines = f.readlines() 
-        cleaned_lines = remove_old_totals_and_trailing_separator(existing_lines) 
-    else: 
-        cleaned_lines = [] 
- 
-    # Mevcut toplam dakika (önceden kaydedilmiş) 
-    old_total_minutes = read_existing_total() 
- 
-    # Yeni girişe ait toplam 
-    current_total_minutes = round(total_minutes_new) 
-    current_total_hours = round(total_hours_new, 2) 
- 
-    # Güncellenmiş genel toplam 
-    grand_total_minutes = old_total_minutes + current_total_minutes 
-    grand_total_hours = round(grand_total_minutes / 60, 2) 
- 
-    # Dosyayı güncelle 
-    with open(file_name, "w", encoding="utf-8") as f: 
-        # Başlık 
-        if not cleaned_lines: 
-            f.write(header + "\n") 
-            f.write(separator + "\n") 
-        else: 
-            for line in cleaned_lines: 
-                f.write(line) 
- 
-        # Yeni girişleri ekle 
-        for r in results: 
-            f.write(f"{r['Başlangıç']:<10} {r['Bitiş']:<10} {r['Süre (dk)']:<10} {r['Süre (saat)']:<12}\n") 
- 
-        # Yeni girişin toplamı 
-        f.write(f"\nToplam Süre (bu giriş): {current_total_minutes} dakika ({current_total_hours} saat)\n") 
-        f.write("=" * 45 + "\n") 
- 
-        # Genel toplam süre (önceki + bu giriş) 
-        f.write(f"\nGenel Toplam Süre: {grand_total_minutes} dakika ({grand_total_hours} saat)\n") 
- 
-    # Konsola yazdır 
-    print("\n" + header) 
-    print(separator) 
-    for r in results: 
-        print(f"{r['Başlangıç']:<10} {r['Bitiş']:<10} {r['Süre (dk)']:<10} {r['Süre (saat)']:<12}") 
-    print(f"\nToplam Süre (bu giriş): {current_total_minutes} dakika ({current_total_hours} saat)") 
-    print(f"Genel Toplam Süre (tüm kayıtlar): {grand_total_minutes} dakika ({grand_total_hours} saat)") 
-def main(): 
-    times = input_times() 
-    results, total_minutes, total_hours = calculate_durations(times) 
-    print_results_and_update_total(results, total_minutes, total_hours) 
+import json
+import os
+from datetime import datetime, timedelta
+from typing import List, Dict, Tuple
 
-if __name__ == "__main__": 
-    main() 
+# --- YAPILANDIRMA ---
+DATA_FILE = "veriler.json"
+TIME_FORMAT = "%H:%M"
+
+def load_data() -> List[Dict]:
+    """
+    JSON dosyasındaki mevcut kayıtları okur.
+    Dosya yoksa boş bir liste döndürür.
+    """
+    if not os.path.exists(DATA_FILE):
+        return []
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        return []
+
+def save_data(data: List[Dict]):
+    """
+    Verilen listeyi JSON formatında dosyaya kaydeder.
+    """
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+def input_time(prompt: str) -> datetime:
+    """Kullanıcıdan saat bilgisi alır ve datetime objesi döndürür."""
+    while True:
+        time_str = input(prompt).strip()
+        try:
+            return datetime.strptime(time_str, TIME_FORMAT)
+        except ValueError:
+            print("Hatalı format! Lütfen 'HH:MM' formatında giriniz (ör: 14:30).")
+
+def calculate_duration(start_dt: datetime, end_dt: datetime) -> float:
+    """
+    İki saat arasındaki farkı dakika cinsinden hesaplar.
+    Eğer bitiş saati başlangıçtan küçükse (gece yarısı geçişi), bitişe 1 gün ekler.
+    """
+    if end_dt < start_dt:
+        # Örnek: Başlangıç 23:00, Bitiş 01:00. Bitişe 1 gün ekle.
+        end_dt += timedelta(days=1)
+    
+    diff = end_dt - start_dt
+    return diff.total_seconds() / 60
+
+def print_summary(data: List[Dict]):
+    """Mevcut verilerin özet tablosunu ve toplam süreyi yazdırır."""
+    if not data:
+        print("\nHenüz kaydedilmiş bir veri yok.")
+        return
+
+    print(f"\n{'Tarih':<12} {'Başlangıç':<10} {'Bitiş':<10} {'Süre (dk)':<10} {'Süre (saat)':<12}")
+    print("-" * 55)
+
+    total_minutes = 0
+    
+    for entry in data:
+        # JSON'dan gelen string verileri ekrana bas
+        print(f"{entry['date']:<12} {entry['start']:<10} {entry['end']:<10} {entry['minutes']:<10} {entry['hours']:<12}")
+        total_minutes += entry['minutes']
+
+    total_hours = total_minutes / 60
+    print("-" * 55)
+    print(f"GENEL TOPLAM: {total_minutes} dakika ({total_hours:.2f} saat)\n")
+
+def main():
+    # 1. Mevcut veriyi yükle
+    history = load_data()
+    
+    # 2. Önceki kayıtları göster
+    print("--- MEVCUT KAYITLAR ---")
+    print_summary(history)
+
+    # 3. Yeni Giriş
+    while True:
+        choice = input("Yeni zaman aralığı eklemek ister misiniz? (e/h): ").lower().strip()
+        if choice != 'e':
+            break
+
+        print("\n--- Yeni Kayıt ---")
+        start_dt = input_time("Giriş saati (HH:MM): ")
+        end_dt = input_time("Çıkış saati (HH:MM): ")
+        
+        minutes = calculate_duration(start_dt, end_dt)
+        hours = round(minutes / 60, 2)
+        
+        # Bugünün tarihini al (Kayıt tarihi olarak)
+        today_str = datetime.now().strftime("%Y-%m-%d")
+
+        # Yeni kaydı oluştur
+        new_entry = {
+            "date": today_str,
+            "start": start_dt.strftime(TIME_FORMAT),
+            "end": end_dt.strftime(TIME_FORMAT),
+            "minutes": round(minutes),
+            "hours": hours
+        }
+        
+        # Listeye ekle ve kaydet
+        history.append(new_entry)
+        save_data(history)
+        print(">> Kayıt başarıyla eklendi!")
+
+    # 4. Çıkışta son durumu göster
+    print_summary(history)
+
+if __name__ == "__main__":
+    main()
